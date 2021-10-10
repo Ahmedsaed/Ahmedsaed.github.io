@@ -3,60 +3,75 @@ const downloadBtn = document.getElementById("download-btn");
 const uploadBtn = document.getElementById("upload-btn");
 const revertBtn = document.getElementById("revert-btn");
 const canvas = document.getElementById("canvas");
-const canvas_ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d");
+const image = document.getElementById("preview");
 
-let fileType;
 let img = new Image();
 let fileName = "";
 
 // Request image file when the canvas is clicked
 function upload() {
-  uploadBtn.click();
+    uploadBtn.click();
+}
+
+// enable buttons
+function enableBtns(state) {
+    if (state == true) {
+        document.getElementById("zoomBtns").style = "";
+        document.getElementById("pills-tabContent").style = "";
+        downloadBtn.disabled = false;
+        revertBtn.disabled = false;
+    } else {
+        document.getElementById("zoomBtns").style = "pointer-events: none; opacity: 0.4;";
+        document.getElementById("pills-tabContent").style = "pointer-events: none; opacity: 0.4;";
+        downloadBtn.disabled = true;
+        revertBtn.disabled = true;
+    }
 }
 
 // Upload File
 uploadBtn.addEventListener("change", () => {
-  // Get File
-  const file = uploadBtn.files[0];
-  fileType = file.type;
-  // Init FileReader API
-  const reader = new FileReader();
+    // enable buttons
+    enableBtns(true);
 
-  // Check for file
-  if (file) {
-    // Set file name
-    fileName = file.name;
-    // Read data as URL
-    reader.readAsDataURL(file);
-  }
+    // clear previous filters/efftects
+    revertBtn.click();
 
-  // Add image to canvas
-  reader.addEventListener(
-    "load",
-    () => {
-      // Set image src
-      img.src = reader.result;
+    // Get File
+    const file = uploadBtn.files[0];
+    
+    // Init FileReader API
+    const reader = new FileReader();
+  
+    // Check for file
+    if (file) {
+      // Set file name and type
+      fileName = file.name;
 
-      // On image load add to canvas
-      img.onload = function () {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        canvas_ctx.imageSmoothingEnabled = false;
-        canvas_ctx.drawImage(img, 0, 0, img.width, img.height);
+      // Read data as URL
+      reader.readAsDataURL(file);
+    }
 
-        // Show resized image in preview element
-        update_preview();
-      };
-    },
-    false
-  );
+    // Add image to canvas
+    reader.addEventListener("load", () => {
+            // Set image src
+            img.src = reader.result;
+            
+            
+            // Add to canvas
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+                canvas.removeAttribute("data-caman-id");
+
+                Caman("#canvas", img, function() {
+                    this.render();
+                });
+            };
+    }, false);
+
 });
-
-// Update the preview <img> image to the canvas
-function update_preview() {
-  var dataurl = canvas.toDataURL(fileType);
-  document.getElementById("preview").src = dataurl;
-}
 
 // Add a bootstrap toooltip to every tag that has "tt" class
 const tooltips = document.querySelectorAll(".tt");
@@ -65,21 +80,21 @@ tooltips.forEach((t) => {
 });
 
 // A function that takes a class name and a bool "state" to hide/show tags
-function hide(state, cls) {
+function hidden(state, cls) {
   var tools = document.getElementsByClassName(cls);
   for (let i = 0; i < tools.length; i++) {
     tools[i].hidden = state;
   }
 }
 
-hide(true, "tool");
-hide(true, "filter");
-hide(false, "crop");
-hide(false, "brightness");
+hidden(true, "tool");
+hidden(true, "filter");
+hidden(false, "crop");
+hidden(false, "brightness");
 
 // Show tool requirments
 document.getElementById("tools").onchange = function () {
-  hide(true, "tool");
+  hidden(true, "tool");
 
   var elements = document.getElementsByClassName(this.value);
   for (let i = 0; i < elements.length; i++) {
@@ -89,7 +104,7 @@ document.getElementById("tools").onchange = function () {
 
 // Show filter requirments
 document.getElementById("filters").onchange = function () {
-  hide(true, "filter");
+  hidden(true, "filter");
 
   var elements = document.getElementsByClassName(this.value);
   for (let i = 0; i < elements.length; i++) {
@@ -97,60 +112,310 @@ document.getElementById("filters").onchange = function () {
   }
 };
 
-// update brightness controls
-let slider = document.getElementById("brightness_range");
-let input_value = document.getElementById("brightness_value");
-let brightness_value = 0;
+// Revert to orignal
+revertBtn.addEventListener("click", (e) => {
+    contrast_value.value = 0; 
+    vibrance_value.value = 0;
+    brightnees_value.value = 0;
+    saturation_value.value = 0;
+    Caman("#canvas", img, function() {
+      this.revert();
+    });
+});
 
-function updateBrightnessValue(controller) {
-  // Sync values between slider and input field
-  if (controller == "input") {
-    slider.value = input_value.value;
-  } else if (controller == "slider") {
-    input_value.value = slider.value;
-  }
-  // Apply Filter
-  brightness(slider.value);
+// Download Image
+downloadBtn.addEventListener("click", () => {
+    const dImage = canvas.toDataURL();
+    const link = document.createElement('a');
+    
+    link.onclick = "return false"
+    link.href = dImage;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+})
 
-  brightness_value = parseInt(slider.value);
-}
-
-// Apply brightness filter on image
-function brightness(amount) {
-  Caman(canvas, function () {
-    // Revert image brightness
-    this.brightness(-1 * brightness_value);
-
-    // Apply new brightness filter
-    this.brightness(amount).render();
-    update_preview();
-  });
-}
+// <-----------------------------------------------------Debugging and Handling jobs-------------------------------------------------->
 
 // Listen to all CamanJS instances
 Caman.Event.listen("processStart", function (job) {
-  console.log("Start:", job.name);
+    console.log("Start:", job.name);
+    enableBtns(false);
 });
 
-// Listen to all CamanJS instances
 Caman.Event.listen("processComplete", function (job) {
-  console.log("Completed:", job.name, brightness_value);
+    console.log("Completed:", job.name);
+    enableBtns(true);
 });
 
-// Zoom In/Out
+function enableDebugging() {
+    Caman.DEBUG = true;
+}
+
+// <-----------------------------------------------------------Zoom In/Out-------------------------------------------------------->
+
 let zoom = 6;
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+const zoomValue = document.getElementById("zoom_value");
+updateZoomBtns();
+
 function zoomIn() {
-	column = document.getElementById("preview")
+	column = document.getElementById("preview_img")
 
 	column.classList.remove("col-" + zoom);
 	zoom++;
 	column.classList.add("col-" + zoom);
+	updateZoomBtns();
 }
 
 function zoomOut() {
-	column = document.getElementById("preview")
+	column = document.getElementById("preview_img")
 
 	column.classList.remove("col-" + zoom);
 	zoom--;
 	column.classList.add("col-" + zoom);
+	updateZoomBtns();
 }
+
+function updateZoomBtns() {
+	if (zoom == 12) {
+		zoomInBtn.disabled = true;
+	} 
+	else if (zoom == 1) {
+		zoomOutBtn.disabled = true;
+	}
+	else {
+		zoomInBtn.disabled = false;
+		zoomOutBtn.disabled = false;
+	}
+
+	zoomValue.value = parseInt(zoom/12 * 100) + "%";
+}
+
+// <------------------------------------------------------------Image manipulation------------------------------------------------>
+
+const brightnees_value = document.getElementById("brightness_value");
+const contrast_value = document.getElementById("contrast_value");
+const saturation_value = document.getElementById("saturation_value");
+const vibrance_value = document.getElementById("vibrance_value");
+
+// Brightness Filter
+function brightness(controller) {
+	if (controller == "+") {
+		Caman("#canvas", img, function() {
+            this.brightness(5).render(function() {
+                brightnees_value.value = parseInt(brightnees_value.value) + 5;
+            });
+        });
+	}
+	else if (controller == "-") {
+		Caman("#canvas", img, function() {
+            this.brightness(-5).render(function() {
+                brightnees_value.value = parseInt(brightnees_value.value) - 5;
+            });
+        });
+	}
+}
+
+// contrast filter
+function contrast(controller) {
+	if (controller == "+") {
+        Caman("#canvas", img, function() {
+            this.contrast(5).render(function() {
+                contrast_value.value = parseInt(contrast_value.value) + 5;
+            });
+        });
+	}
+	else if (controller == "-") {
+        Caman("#canvas", img, function() {
+            this.contrast(-5).render(function() {
+                contrast_value.value = parseInt(contrast_value.value) - 5;
+            });
+        });
+	}
+}
+
+// saturation filter
+function saturation(controller) {
+	if (controller == "+") {
+        Caman("#canvas", img, function() {
+            this.saturation(5).render(function() {
+                saturation_value.value = parseInt(saturation_value.value) + 5;
+            });
+        });
+	}
+	else if (controller == "-") {
+        Caman("#canvas", img, function() {
+            this.saturation(-5).render(function() {
+                saturation_value.value = parseInt(saturation_value.value) - 5;
+            });
+        });
+	}
+}
+
+// vibrance filter
+function vibrance(controller) {
+	if (controller == "+") {
+        Caman("#canvas", img, function() {
+            this.vibrance(5).render(function() {
+                vibrance_value.value = parseInt(vibrance_value.value) + 5;                
+            });
+        });
+	}
+	else if (controller == "-") {
+        Caman("#canvas", img, function() {
+            this.vibrance(-5).render(function() {
+                vibrance_value.value = parseInt(vibrance_value.value) - 5;
+            });
+        });
+	}
+}
+
+// sepia effect
+function sepia() {
+    Caman("#canvas", img, function () {
+        this.sepia(50).render();
+    });
+}
+
+// vintage effect
+function vintage() {
+    Caman("#canvas", img, function () {
+        this.vintage().render();
+    });
+}
+
+// lomo effect
+function lomo() {
+    Caman("#canvas", img, function () {
+        this.lomo().render();
+    });
+}
+
+// greyscale effect
+function greyscale() {
+    Caman("#canvas", img, function () {
+        this.greyscale().render();
+    });
+}
+
+// clarity effect
+function clarity() {
+    Caman("#canvas", img, function () {
+        this.clarity().render();
+    });
+}
+
+// sinCity effect
+function sinCity() {
+    Caman("#canvas", img, function () {
+        this.sinCity().render();
+    });
+}
+
+// crossProcess effect
+function crossProcess() {
+    Caman("#canvas", img, function () {
+        this.crossProcess().render();
+    });
+}
+
+// pinhole effect
+function pinhole() {
+    Caman("#canvas", img, function () {
+        this.pinhole().render();
+    });
+}
+
+// nostalgia effect
+function nostalgia() {
+    Caman("#canvas", img, function () {
+        this.nostalgia().render();
+    });
+}
+
+// herMajesty effect
+function herMajesty() {
+    Caman("#canvas", img, function () {
+        this.herMajesty().render();
+    });
+}
+
+// orangePeel effect
+function orangePeel() {
+    Caman("#canvas", img, function () {
+        this.orangePeel().render();
+    });
+}
+
+// love effect
+function love() {
+    Caman("#canvas", img, function () {
+        this.love().render();
+    });
+}
+
+// grungy effect
+function grungy() {
+    Caman("#canvas", img, function () {
+        this.grungy().render();
+    });
+}
+
+// jarques effect
+function jarques() {
+    Caman("#canvas", img, function () {
+        this.jarques().render();
+    });
+}
+
+// oldBoot effect
+function oldBoot() {
+    Caman("#canvas", img, function () {
+        this.oldBoot().render();
+    });
+}
+
+// glowingSun effect
+function glowingSun() {
+    Caman("#canvas", img, function () {
+        this.glowingSun().render();
+    });
+}
+
+// hazyDays effect
+function hazyDays() {
+    Caman("#canvas", img, function () {
+        this.hazyDays().render();
+    });
+}
+
+// hemingway effect
+function hemingway() {
+    Caman("#canvas", img, function () {
+        this.hemingway().render();
+    });
+}
+
+// concentrate effect
+function concentrate() {
+    Caman("#canvas", img, function () {
+        this.concentrate().render();
+    });
+}
+
+// stackBlur effect
+function stackBlur() {
+    Caman("#canvas", img, function () {
+        console.log("Started: stackBlur");
+        this.stackBlur(15).render(function() {
+            console.log("Completed: stackBlur");
+        });
+    });
+}
+
+// <---------------------------------------------------------------------------------------------------------------------------------->
+
+
