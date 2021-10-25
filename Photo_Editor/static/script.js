@@ -159,11 +159,6 @@ revertBtn.addEventListener("click", (e) => {
         canvas.width = img.width;
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0)
-        
-        // revert effects
-        Caman("#canvas", img, function() {
-          this.revert();
-        });
     }
 });
 
@@ -373,8 +368,8 @@ function addWaterMark() {
                 ctx.drawImage(watermark_img, canvas.width - wmImg_width, canvas.height - wmImg_height, wmImg_width , wmImg_height);
             }
             
-            enableBtns(true);
             ctx.restore();
+            updateCanvas();
         };
     }, 
     false);
@@ -440,8 +435,7 @@ function addText() {
         ctx.fillText(text_string, canvas.width - 10, canvas.height - 10);
     }
 
-    // enable buttons
-    enableBtns(true);
+    updateCanvas();
 }
 
 // flip image
@@ -515,12 +509,7 @@ function cropImg() {
         canvas.height = bottom;
         ctx.drawImage(img, left, top, right, bottom, 0, 0, canvas.width, canvas.height);
         
-        Caman("#canvas", img, function() {
-            this.render();
-        });
-        
-        // enable buttons
-        enableBtns(true);
+        updateCanvas();
     }
 }
 
@@ -557,6 +546,26 @@ function ImageTools(img, x, y, width, height, deg, flip, flop, center) {
     
     // enable buttons   
     enableBtns(true);
+}
+
+// update canvas after using tools
+function updateCanvas()
+{
+    enableBtns(false);
+
+    let image = new Image();
+
+    image.src = canvas.toDataURL();
+    
+    // Add to canvas
+    image.onload = function() {
+        canvas.width = image.width;
+        canvas.height = image.height;
+        ctx.drawImage(image, 0, 0, image.width, image.height);
+        canvas.removeAttribute("data-caman-id");
+
+        enableBtns(true);
+    };
 }
 
 // <------------------------------------------------------------Image manipulation | Filters ------------------------------------------------>
